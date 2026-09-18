@@ -25,7 +25,7 @@ Version: 1.1 | Updated: 18 September 2026 | Project: BUP CSE Fest 2026 online pr
 | Container registry reference | TBD - exact tag or digest required |
 | Video location | TBD - organizer-accessible, maximum 3:00 |
 | Evaluation-window end | TBD - service and dependencies must remain available |
-| Latest tested commit / image digest | Working tree based on 6752ffe; image digest pending |
+| Latest tested commit / image digest | d75ce91 (application); image digest pending |
 | Release readiness | CORE READY; registry image, video, submission, and post-deadline release remain |
 
 Use this file at each milestone and handoff. Update the task, evidence, decision, and risk tables when work changes. Record actual results; never change a status to Done solely because code was written.
@@ -220,14 +220,14 @@ Change log format for future decisions: `timestamp | decision/change | source or
 | Health URL | https://bup-hackaton.onrender.com/health |
 | Optimization URL | https://bup-hackaton.onrender.com/optimize-energy |
 | Repository URL | https://github.com/Rabetul-islam-asif/Bup-hackaton.git |
-| Submitted commit | d3d1bf0 |
+| Candidate application commit | d75ce91 |
 | Image reference / digest | TBD |
 | Documented service port | 8000 |
 | Provider / model identifier | NVIDIA (meta/llama-3.2-11b-vision-instruct) |
 | Required environment-variable names only | NVIDIA_API_KEY, NVIDIA_MODEL |
 | README location | `/README.md` |
 | Video URL / file and duration | TBD |
-| Last external verification time | 18 September 2026, 22:35 Asia/Dhaka; health + SAMPLE-01 passed |
+| Last external verification time | 18 September 2026, 22:39 Asia/Dhaka; deployed OpenAPI update, health, and SAMPLE-01 passed |
 | Submission time and receipt | TBD |
 | Post-deadline repository visibility verified | TBD |
 

@@ -126,8 +126,16 @@ class BatteryParameters(BaseModel):
         return self
 
 
+from app.defaults import SAMPLE_OPTIMIZE_REQUEST_EXAMPLE
+
+
 class OptimizeEnergyRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [SAMPLE_OPTIMIZE_REQUEST_EXAMPLE]
+        },
+    )
 
     scenario_id: str
     operator_notes: list[str]
@@ -165,6 +173,50 @@ class OptimizeEnergyRequest(BaseModel):
             missing = sorted(set(range(24)) - seen_hours)
             raise ValueError(f"hours must cover all hours 0..23, missing: {missing}")
         return sorted(v, key=lambda x: x.hour)
+
+
+class QuickOptimizeRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "examples": [
+                {
+                    "operator_notes": [
+                        "Do not charge the battery between 6 PM and 9 PM."
+                    ],
+                    "scenario_id": "QUICK-DEMO",
+                }
+            ]
+        },
+    )
+
+    operator_notes: list[str] = Field(
+        default_factory=lambda: ["Do not charge the battery between 6 PM and 9 PM."],
+        description="List of 1 to 3 operator notes/directives in natural language, or a single note string.",
+    )
+    scenario_id: str = Field(
+        default="QUICK-DEMO",
+        description="Optional scenario identifier.",
+    )
+
+    @field_validator("operator_notes", mode="before")
+    @classmethod
+    def validate_quick_notes(cls, v: Any) -> list[str]:
+        if isinstance(v, str):
+            v = [v]
+        if not isinstance(v, list):
+            raise ValueError("operator_notes must be a list of strings or a single string")
+        cleaned = [str(x).strip() for x in v if str(x).strip()]
+        if not (1 <= len(cleaned) <= 3):
+            raise ValueError(f"operator_notes must contain between 1 and 3 items, got {len(cleaned)}")
+        return cleaned
+
+    @field_validator("scenario_id")
+    @classmethod
+    def validate_quick_scenario_id(cls, v: str) -> str:
+        if not isinstance(v, str) or not v.strip():
+            return "QUICK-DEMO"
+        return v.strip()
 
 
 # --- Response Schemas ---

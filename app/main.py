@@ -17,10 +17,14 @@ from app.interpreter import LLMProviderError, interpreter
 from app.optimizer import OptimizationInfeasibleError, solve_energy_schedule
 from app.replay import ReplayValidationError, replay_schedule, verify_response_aggregates
 from app.response import assemble_optimization_response
+from app.defaults import DEFAULT_CAMPUS_BATTERY_DATA, DEFAULT_CAMPUS_HOURS_DATA
 from app.schemas import (
+    BatteryParameters,
     HealthResponse,
+    HourlyForecast,
     OptimizeEnergyRequest,
     OptimizeEnergyResponse,
+    QuickOptimizeRequest,
 )
 
 # Logging configuration
@@ -178,3 +182,24 @@ def optimize_energy(payload: OptimizeEnergyRequest) -> OptimizeEnergyResponse:
 
     logger.info("Scenario '%s' optimized successfully: Cost=%.2f BDT, Grid=%.2f kWh", response.scenario_id, response.total_cost_bdt, response.total_grid_kwh)
     return response
+
+
+DEFAULT_BATTERY = BatteryParameters.model_validate(DEFAULT_CAMPUS_BATTERY_DATA)
+DEFAULT_HOURS = [HourlyForecast.model_validate(h) for h in DEFAULT_CAMPUS_HOURS_DATA]
+
+
+@app.post("/quick-optimize", response_model=OptimizeEnergyResponse, tags=["Optimization"])
+def quick_optimize(payload: QuickOptimizeRequest) -> OptimizeEnergyResponse:
+    """Convenience endpoint to test operator notes directly using the standard 24-hour campus baseline.
+
+    Allows providing ONLY operator notes without needing to submit 24 hours of forecast and battery data.
+    """
+    logger.info("Processing quick-optimize request for scenario '%s' with %d notes", payload.scenario_id, len(payload.operator_notes))
+    full_request = OptimizeEnergyRequest(
+        scenario_id=payload.scenario_id,
+        operator_notes=payload.operator_notes,
+        hours=DEFAULT_HOURS,
+        battery=DEFAULT_BATTERY,
+    )
+    return optimize_energy(full_request)
+

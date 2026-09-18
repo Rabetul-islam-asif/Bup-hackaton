@@ -138,3 +138,32 @@ def test_health_reports_unavailable_without_api_key(monkeypatch):
     response = client.get("/health")
     assert response.status_code == 503
     assert response.json() == {"status": "unavailable"}
+
+
+def test_quick_optimize_validation_rejects_empty():
+    response = client.post("/quick-optimize", json={"operator_notes": []})
+    assert response.status_code == 400
+
+
+def test_quick_optimize_validation_rejects_too_many():
+    response = client.post("/quick-optimize", json={"operator_notes": ["1", "2", "3", "4"]})
+    assert response.status_code == 400
+
+
+def test_quick_optimize_string_coercion():
+    from app.schemas import QuickOptimizeRequest
+    req = QuickOptimizeRequest.model_validate({"operator_notes": "Do not charge the battery between 6 PM and 9 PM."})
+    assert len(req.operator_notes) == 1
+    assert req.operator_notes[0] == "Do not charge the battery between 6 PM and 9 PM."
+
+
+def test_openapi_schema_contains_examples():
+    response = client.get("/openapi.json")
+    assert response.status_code == 200
+    schema = response.json()
+    # Ensure OptimizeEnergyRequest schema includes examples
+    req_schema = schema["components"]["schemas"]["OptimizeEnergyRequest"]
+    assert "examples" in req_schema
+    assert len(req_schema["examples"]) > 0
+    assert "operator_notes" in req_schema["examples"][0]
+

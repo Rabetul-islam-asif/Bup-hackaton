@@ -8,7 +8,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.config import settings
 from app.constraints import compile_hourly_constraints
@@ -122,6 +122,12 @@ async def generic_exception_handler(request: Request, exc: Exception):
 
 
 # --- Endpoints ---
+
+
+@app.get("/", tags=["System"], include_in_schema=False)
+async def root_redirect():
+    """Redirect root browser visits to interactive documentation."""
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/health", response_model=HealthResponse, tags=["System"], responses={503: {"description": "Service not ready"}})

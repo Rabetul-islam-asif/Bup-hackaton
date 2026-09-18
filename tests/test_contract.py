@@ -1,0 +1,125 @@
+"""API contract and input validation tests."""
+
+import copy
+import json
+from pathlib import Path
+import pytest
+from fastapi.testclient import TestClient
+
+from app.main import app
+from tools.check_nvidia_model import find_sample_pack
+
+client = TestClient(app)
+
+
+@pytest.fixture(scope="module")
+def valid_payload():
+    root = Path(__file__).resolve().parents[1]
+    pack = json.loads(find_sample_pack(root).read_text(encoding="utf-8-sig"))
+    return copy.deepcopy(pack["cases"][0]["input"])
+
+
+def test_health_endpoint():
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_malformed_json():
+    response = client.post(
+        "/optimize-energy",
+        content="not valid json {{{",
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.status_code == 400
+
+
+def test_missing_scenario_id(valid_payload):
+    payload = copy.deepcopy(valid_payload)
+    del payload["scenario_id"]
+    response = client.post("/optimize-energy", json=payload)
+    assert response.status_code == 400
+
+
+def test_empty_scenario_id(valid_payload):
+    payload = copy.deepcopy(valid_payload)
+    payload["scenario_id"] = "   "
+    response = client.post("/optimize-energy", json=payload)
+    assert response.status_code == 400
+
+
+def test_invalid_note_count_zero(valid_payload):
+    payload = copy.deepcopy(valid_payload)
+    payload["operator_notes"] = []
+    response = client.post("/optimize-energy", json=payload)
+    assert response.status_code == 400
+
+
+def test_invalid_note_count_too_many(valid_payload):
+    payload = copy.deepcopy(valid_payload)
+    payload["operator_notes"] = ["Note 1", "Note 2", "Note 3", "Note 4"]
+    response = client.post("/optimize-energy", json=payload)
+    assert response.status_code == 400
+
+
+def test_empty_string_in_notes(valid_payload):
+    payload = copy.deepcopy(valid_payload)
+    payload["operator_notes"] = ["Note 1", "   "]
+    response = client.post("/optimize-energy", json=payload)
+    assert response.status_code == 400
+
+
+def test_missing_hour_in_24(valid_payload):
+    payload = copy.deepcopy(valid_payload)
+    payload["hours"] = payload["hours"][:-1]  # 23 hours instead of 24
+    response = client.post("/optimize-energy", json=payload)
+    assert response.status_code == 400
+
+
+def test_duplicate_hour(valid_payload):
+    payload = copy.deepcopy(valid_payload)
+    payload["hours"][1]["hour"] = payload["hours"][0]["hour"]
+    response = client.post("/optimize-energy", json=payload)
+    assert response.status_code == 400
+
+
+def test_hour_out_of_range(valid_payload):
+    payload = copy.deepcopy(valid_payload)
+    payload["hours"][0]["hour"] = 24
+    response = client.post("/optimize-energy", json=payload)
+    assert response.status_code == 400
+
+
+def test_boolean_in_numeric_field(valid_payload):
+    payload = copy.deepcopy(valid_payload)
+    payload["hours"][0]["demand_kwh"] = True
+    response = client.post("/optimize-energy", json=payload)
+    assert response.status_code == 400
+
+
+def test_negative_demand(valid_payload):
+    payload = copy.deepcopy(valid_payload)
+    payload["hours"][0]["demand_kwh"] = -5.0
+    response = client.post("/optimize-energy", json=payload)
+    assert response.status_code == 400
+
+
+def test_incoherent_battery_initial_greater_than_capacity(valid_payload):
+    payload = copy.deepcopy(valid_payload)
+    payload["battery"]["initial_energy_kwh"] = payload["battery"]["capacity_kwh"] + 100
+    response = client.post("/optimize-energy", json=payload)
+    assert response.status_code == 400
+
+
+def test_incoherent_battery_min_greater_than_initial(valid_payload):
+    payload = copy.deepcopy(valid_payload)
+    payload["battery"]["minimum_energy_kwh"] = payload["battery"]["initial_energy_kwh"] + 50
+    response = client.post("/optimize-energy", json=payload)
+    assert response.status_code == 400
+
+
+def test_zero_capacity_rejected(valid_payload):
+    payload = copy.deepcopy(valid_payload)
+    payload["battery"]["capacity_kwh"] = 0.0
+    response = client.post("/optimize-energy", json=payload)
+    assert response.status_code == 400

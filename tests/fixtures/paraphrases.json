@@ -1,0 +1,106 @@
+{
+  "test_cases": [
+    {
+      "id": "PARAPHRASE-01",
+      "operator_notes": [
+        "Dust storms are expected to slash solar output by 70% between 1 PM and 4 PM.",
+        "Reminder: All staff must submit attendance sheets by Friday."
+      ],
+      "battery_capacity_kwh": 300.0,
+      "expected_directives": [
+        {
+          "note_index": 0,
+          "applies": true,
+          "directive_type": "solar_reduction",
+          "structured_adjustment": {
+            "hours": [13, 14, 15],
+            "factor": 0.3
+          }
+        },
+        {
+          "note_index": 1,
+          "applies": false,
+          "directive_type": "no_op",
+          "structured_adjustment": null
+        }
+      ]
+    },
+    {
+      "id": "PARAPHRASE-02",
+      "operator_notes": [
+        "Inverter maintenance scheduled from 3 AM to 6 AM; please do not charge the storage system during this interval."
+      ],
+      "battery_capacity_kwh": 400.0,
+      "expected_directives": [
+        {
+          "note_index": 0,
+          "applies": true,
+          "directive_type": "no_charge_window",
+          "structured_adjustment": {
+            "hours": [3, 4, 5]
+          }
+        }
+      ]
+    },
+    {
+      "id": "PARAPHRASE-03",
+      "operator_notes": [
+        "Substation maintenance requires that the battery must avoid discharging from 7 PM until 9 PM.",
+        "Please turn off hallway monitors when leaving the office."
+      ],
+      "battery_capacity_kwh": 250.0,
+      "expected_directives": [
+        {
+          "note_index": 0,
+          "applies": true,
+          "directive_type": "no_discharge_window",
+          "structured_adjustment": {
+            "hours": [19, 20]
+          }
+        },
+        {
+          "note_index": 1,
+          "applies": false,
+          "directive_type": "no_op",
+          "structured_adjustment": null
+        }
+      ]
+    },
+    {
+      "id": "PARAPHRASE-04",
+      "operator_notes": [
+        "Due to campus event preparations, maintain at least 40% state of charge in the battery between 5 PM and 8 PM."
+      ],
+      "battery_capacity_kwh": 200.0,
+      "expected_directives": [
+        {
+          "note_index": 0,
+          "applies": true,
+          "directive_type": "minimum_battery_reserve",
+          "structured_adjustment": {
+            "hours": [17, 18, 19],
+            "minimum_energy_kwh": 80.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "PARAPHRASE-05",
+      "operator_notes": [
+        "Main transformer capacity limit: grid electricity intake cannot exceed 120 kWh per hour from 6 PM to 10 PM."
+      ],
+      "battery_capacity_kwh": 300.0,
+      "expected_directives": [
+        {
+          "note_index": 0,
+          "applies": true,
+          "directive_type": "max_grid_window",
+          "structured_adjustment": {
+            "hours": [18, 19, 20, 21],
+            "max_grid_kwh": 120.0
+          }
+        }
+      ]
+    }
+  ]
+}

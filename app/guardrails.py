@@ -97,6 +97,9 @@ def extract_window_range(text: str) -> list[int] | None:
     if start_h is not None and end_h is not None:
         if (end_tok.lower() in ("midnight", "12 am", "12:00 am") or end_h == 0) and start_h > 0:
             end_h = 24
+        elif end_tok.lower() in ("12 pm", "12:00 pm") and start_h >= 12:
+            # Common user typo: writing 12 PM intending midnight after an evening hour
+            end_h = 24
         if 0 <= start_h < end_h <= 24:
             return list(range(start_h, end_h))
     return None

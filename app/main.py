@@ -126,7 +126,7 @@ async def get_health() -> HealthResponse:
 
 
 @app.post("/optimize-energy", response_model=OptimizeEnergyResponse, tags=["Optimization"])
-async def optimize_energy(payload: OptimizeEnergyRequest) -> OptimizeEnergyResponse:
+def optimize_energy(payload: OptimizeEnergyRequest) -> OptimizeEnergyResponse:
     """Interpret operator notes with LLM, compile constraints, solve LP, and verify schedule."""
     logger.info("Processing optimization request for scenario '%s' with %d notes", payload.scenario_id, len(payload.operator_notes))
 

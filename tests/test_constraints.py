@@ -138,3 +138,44 @@ def test_grid_cap_window():
     assert c.grid_cap[14] == 30.0
     assert c.grid_cap[15] == 30.0
     assert math.isinf(c.grid_cap[13])
+
+
+def test_overlapping_solar_and_grid_caps():
+    hours = make_sample_forecasts()
+    battery = make_sample_battery()
+    directives = [
+        {
+            "note_index": 0,
+            "applies": True,
+            "directive_type": "solar_reduction",
+            "structured_adjustment": {"hours": [12], "factor": 0.8},
+            "explanation": "20% reduction",
+        },
+        {
+            "note_index": 1,
+            "applies": True,
+            "directive_type": "solar_reduction",
+            "structured_adjustment": {"hours": [12], "factor": 0.5},
+            "explanation": "50% reduction",
+        },
+        {
+            "note_index": 2,
+            "applies": True,
+            "directive_type": "max_grid_window",
+            "structured_adjustment": {"hours": [14], "max_grid_kwh": 100.0},
+            "explanation": "Cap 100",
+        },
+    ]
+    directives.append({
+        "note_index": 3,
+        "applies": True,
+        "directive_type": "max_grid_window",
+        "structured_adjustment": {"hours": [14], "max_grid_kwh": 60.0},
+        "explanation": "Tighter cap 60",
+    })
+    c = compile_hourly_constraints(hours, battery, directives)
+    # Solar on hour 12 was 50.0. Min factor is 0.5 -> 25.0
+    assert c.effective_solar[12] == 25.0
+    # Grid cap on hour 14 was inf. Min cap is 60.0
+    assert c.grid_cap[14] == 60.0
+

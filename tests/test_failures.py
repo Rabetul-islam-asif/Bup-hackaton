@@ -84,3 +84,52 @@ def test_guardrail_failure_returns_sanitized_500():
         assert response.status_code == 500
         data = response.json()
         assert data["detail"] == "Failed to extract valid directives from notes"
+
+
+def test_api_handles_optimization_infeasible_sanitized():
+    with patch("app.main.solve_energy_schedule", side_effect=OptimizationInfeasibleError("No feasible basis")):
+        payload = {
+            "scenario_id": "ERR-03",
+            "operator_notes": ["Routine inspection completed."],
+            "hours": [
+                {"hour": h, "demand_kwh": 50.0, "solar_kwh": 10.0, "tariff_bdt_per_kwh": 10.0}
+                for h in range(24)
+            ],
+            "battery": {
+                "capacity_kwh": 100.0,
+                "initial_energy_kwh": 50.0,
+                "minimum_energy_kwh": 10.0,
+                "max_charge_kwh_per_hour": 25.0,
+                "max_discharge_kwh_per_hour": 25.0,
+            },
+        }
+        with patch("app.main.interpreter.interpret", return_value=[{"note_index": 0, "applies": False, "directive_type": "no_op", "structured_adjustment": None, "explanation": "no op"}]):
+            response = client.post("/optimize-energy", json=payload)
+            assert response.status_code == 500
+            assert response.json()["detail"] == "Energy schedule optimization infeasible"
+
+
+def test_api_handles_replay_validation_failure_sanitized():
+    from app.replay import ReplayValidationError
+
+    with patch("app.main.replay_schedule", side_effect=ReplayValidationError("Balance violation")):
+        payload = {
+            "scenario_id": "ERR-04",
+            "operator_notes": ["Routine inspection completed."],
+            "hours": [
+                {"hour": h, "demand_kwh": 50.0, "solar_kwh": 10.0, "tariff_bdt_per_kwh": 10.0}
+                for h in range(24)
+            ],
+            "battery": {
+                "capacity_kwh": 100.0,
+                "initial_energy_kwh": 50.0,
+                "minimum_energy_kwh": 10.0,
+                "max_charge_kwh_per_hour": 25.0,
+                "max_discharge_kwh_per_hour": 25.0,
+            },
+        }
+        with patch("app.main.interpreter.interpret", return_value=[{"note_index": 0, "applies": False, "directive_type": "no_op", "structured_adjustment": None, "explanation": "no op"}]):
+            response = client.post("/optimize-energy", json=payload)
+            assert response.status_code == 500
+            assert response.json()["detail"] == "Internal schedule verification failed"
+

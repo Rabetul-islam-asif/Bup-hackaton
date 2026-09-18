@@ -51,3 +51,65 @@ def test_all_10_reference_cases_optimal_cost_and_replay(sample_pack):
             f"Case {case_id} cost mismatch: got {resp.total_cost_bdt:.2f} BDT, "
             f"expected {expected_cost:.2f} BDT (delta: {cost_diff:.4f} BDT)"
         )
+
+
+def test_zero_solar_all_day_passes_replay():
+    """Verify optimizer and replay when solar generation is 0.0 across all 24 hours."""
+    from app.schemas import BatteryParameters, HourlyForecast
+
+    hours = [
+        HourlyForecast(
+            hour=h,
+            demand_kwh=80.0,
+            solar_kwh=0.0,
+            tariff_bdt_per_kwh=5.0 if h < 6 else (15.0 if 17 <= h <= 22 else 10.0),
+        )
+        for h in range(24)
+    ]
+    battery = BatteryParameters(
+        capacity_kwh=200.0,
+        initial_energy_kwh=100.0,
+        minimum_energy_kwh=20.0,
+        max_charge_kwh_per_hour=50.0,
+        max_discharge_kwh_per_hour=50.0,
+    )
+    directives = []
+    constraints = compile_hourly_constraints(hours, battery, directives)
+    opt_res = solve_energy_schedule(constraints)
+    resp = assemble_optimization_response("ZERO_SOLAR", hours, directives, opt_res)
+
+    # Replay must pass without error
+    replay_schedule(hours, battery, directives, resp.hourly_plan)
+    assert resp.total_cost_bdt > 0.0
+    assert abs(resp.hourly_plan[23].battery_energy_after_kwh - 100.0) < 1e-4
+
+
+def test_battery_at_minimum_initial_energy():
+    """Verify optimizer and replay when battery starts at minimum allowed reserve."""
+    from app.schemas import BatteryParameters, HourlyForecast
+
+    hours = [
+        HourlyForecast(
+            hour=h,
+            demand_kwh=100.0,
+            solar_kwh=60.0 if 9 <= h <= 15 else 0.0,
+            tariff_bdt_per_kwh=4.0 if h < 8 else (12.0 if 16 <= h <= 21 else 8.0),
+        )
+        for h in range(24)
+    ]
+    battery = BatteryParameters(
+        capacity_kwh=150.0,
+        initial_energy_kwh=30.0,
+        minimum_energy_kwh=30.0,
+        max_charge_kwh_per_hour=40.0,
+        max_discharge_kwh_per_hour=40.0,
+    )
+    directives = []
+    constraints = compile_hourly_constraints(hours, battery, directives)
+    opt_res = solve_energy_schedule(constraints)
+    resp = assemble_optimization_response("MIN_INITIAL", hours, directives, opt_res)
+
+    replay_schedule(hours, battery, directives, resp.hourly_plan)
+    # Final state must restore to initial (30.0)
+    assert abs(resp.hourly_plan[23].battery_energy_after_kwh - 30.0) < 1e-4
+

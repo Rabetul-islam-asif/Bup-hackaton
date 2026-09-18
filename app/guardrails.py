@@ -65,6 +65,21 @@ def parse_hour_token(token: str, default_period: str | None = None) -> int | Non
 def extract_window_range(text: str) -> list[int] | None:
     """Extract strictly start-inclusive, end-exclusive hour range [S, E) from text."""
     text_lower = text.lower()
+    # 1. Duration pattern: e.g. 'starting at 2 PM for 3 hours' or 'from 10:00 for 2 hrs'
+    dur_m = re.search(
+        r"(?:starting|beginning|at|from)\s+(\d{1,2}(?::00)?\s*(?:am|pm)?|noon|midnight)\s+(?:for|lasting)\s+(\d+)\s*(?:hours?|hrs?)",
+        text,
+        re.IGNORECASE,
+    )
+    if dur_m:
+        st_tok = dur_m.group(1).strip()
+        dur = int(dur_m.group(2))
+        st_p = "pm" if "pm" in text_lower else ("am" if "am" in text_lower else None)
+        st_h = parse_hour_token(st_tok, st_p)
+        if st_h is not None and 0 <= st_h < 24 and 0 < dur <= 24 and st_h + dur <= 24:
+            return list(range(st_h, st_h + dur))
+
+    # 2. Window range pattern: e.g. 'between 18:00 and 20:00', 'from 10 PM until midnight'
     pattern = r"(?:from|between)\s+(\d{1,2}(?::00)?\s*(?:am|pm)?|noon|midnight)\s+(?:until|to|and|-)\s+(\d{1,2}(?::00)?\s*(?:am|pm)?|noon|midnight)"
     m = re.search(pattern, text, re.IGNORECASE)
     if not m:
@@ -79,8 +94,11 @@ def extract_window_range(text: str) -> list[int] | None:
     start_h = parse_hour_token(start_tok, start_period)
     end_h = parse_hour_token(end_tok, end_period)
 
-    if start_h is not None and end_h is not None and 0 <= start_h < end_h <= 24:
-        return list(range(start_h, end_h))
+    if start_h is not None and end_h is not None:
+        if (end_tok.lower() in ("midnight", "12 am", "12:00 am") or end_h == 0) and start_h > 0:
+            end_h = 24
+        if 0 <= start_h < end_h <= 24:
+            return list(range(start_h, end_h))
     return None
 
 

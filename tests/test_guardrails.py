@@ -202,3 +202,23 @@ def test_rejects_no_op_with_adjustment():
     }
     with pytest.raises(DirectiveValidationError):
         validate_interpretations(payload, note_count=1, battery_capacity=200.0)
+
+
+def test_extract_window_range_edge_cases():
+    from app.guardrails import extract_window_range
+
+    # Duration patterns
+    assert extract_window_range("Starting at 2 PM for 3 hours") == [14, 15, 16]
+    assert extract_window_range("from 9:00 AM lasting 4 hours") == [9, 10, 11, 12]
+    assert extract_window_range("beginning at 10 AM for 2 hrs") == [10, 11]
+
+    # Midnight end patterns
+    assert extract_window_range("from 10 PM until midnight") == [22, 23]
+    assert extract_window_range("from 8 PM to 12 AM") == [20, 21, 22, 23]
+    assert extract_window_range("from midnight to 4 AM") == [0, 1, 2, 3]
+
+    # 24-hour clock patterns
+    assert extract_window_range("between 18:00 and 20:00") == [18, 19]
+    assert extract_window_range("from 14:00 to 17:00") == [14, 15, 16]
+    assert extract_window_range("between 9:00 and 13:00") == [9, 10, 11, 12]
+

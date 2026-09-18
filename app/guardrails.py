@@ -198,15 +198,7 @@ def validate_interpretations(
         if not isinstance(raw_hours, list) or len(raw_hours) == 0:
             raise DirectiveValidationError(f"{directive_type} hours must be a non-empty list")
 
-        for h in raw_hours:
-            _strict_int(h, f"{directive_type} hour")
-            if h < 0 or h > 23:
-                raise DirectiveValidationError(f"{directive_type} hour out of bounds: {h}")
-
-        if raw_hours != sorted(set(raw_hours)):
-            raise DirectiveValidationError(f"{directive_type} hours must be unique sorted integers in 0..23")
-
-        # Deterministic start-inclusive, end-exclusive window enforcement:
+        # Deterministic start-inclusive, end-exclusive window enforcement from note text:
         if operator_notes and expected_index < len(operator_notes):
             note_text = operator_notes[expected_index]
             window_h = extract_window_range(note_text)
@@ -216,6 +208,14 @@ def validate_interpretations(
                 end_h = _extract_end_hour(note_text)
                 if end_h is not None and len(raw_hours) > 1 and raw_hours[-1] == end_h:
                     raw_hours = raw_hours[:-1]
+
+        for h in raw_hours:
+            _strict_int(h, f"{directive_type} hour")
+            if h < 0 or h > 23:
+                raise DirectiveValidationError(f"{directive_type} hour out of bounds: {h}")
+
+        if raw_hours != sorted(set(raw_hours)):
+            raise DirectiveValidationError(f"{directive_type} hours must be unique sorted integers in 0..23")
 
         validated_adj: dict[str, Any] = {"hours": list(raw_hours)}
 

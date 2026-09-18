@@ -25,8 +25,8 @@ Version: 1.1 | Updated: 18 September 2026 | Project: BUP CSE Fest 2026 online pr
 | Container registry reference | TBD - exact tag or digest required |
 | Video location | TBD - organizer-accessible, maximum 3:00 |
 | Evaluation-window end | TBD - service and dependencies must remain available |
-| Latest tested commit / image digest | cde91fc |
-| Release readiness | READY FOR DEPLOYMENT - all 10 public cases, 54 tests, and replay verified |
+| Latest tested commit / image digest | 55ba298 |
+| Release readiness | READY FOR DEPLOYMENT - all 10 public cases, 60 tests, and replay verified |
 
 Use this file at each milestone and handoff. Update the task, evidence, decision, and risk tables when work changes. Record actual results; never change a status to Done solely because code was written.
 

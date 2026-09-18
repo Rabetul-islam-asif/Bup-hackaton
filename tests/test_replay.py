@@ -5,7 +5,7 @@ import pytest
 
 from app.constraints import compile_hourly_constraints
 from app.optimizer import solve_energy_schedule
-from app.replay import ReplayValidationError, replay_schedule
+from app.replay import ReplayValidationError, replay_schedule, verify_response_aggregates
 from app.response import assemble_optimization_response
 from app.schemas import BatteryParameters, HourlyForecast, HourlyPlan
 
@@ -105,3 +105,43 @@ def test_replay_rejects_terminal_neutrality_violation():
     with pytest.raises(ReplayValidationError):
         replay_schedule(hours, bad_battery, directives, plan)
 
+
+def test_response_aggregates_match_serialized_plan():
+    hours, _, directives, _ = make_valid_schedule()
+    # A high tariff exposes any mismatch between raw solver values and the
+    # six-decimal values serialized in the public hourly plan.
+    for hour in hours:
+        hour.tariff_bdt_per_kwh = 99_999_999.9
+    constraints = compile_hourly_constraints(
+        hours,
+        BatteryParameters(
+            capacity_kwh=200.0,
+            initial_energy_kwh=100.0,
+            minimum_energy_kwh=20.0,
+            max_charge_kwh_per_hour=50.0,
+            max_discharge_kwh_per_hour=50.0,
+        ),
+        directives,
+    )
+    response = assemble_optimization_response(
+        "AGG-01", hours, directives, solve_energy_schedule(constraints)
+    )
+    verify_response_aggregates(
+        hours,
+        response.hourly_plan,
+        response.total_grid_kwh,
+        response.total_cost_bdt,
+        response.peak_grid_kwh,
+    )
+
+
+def test_response_aggregate_verifier_rejects_mismatch():
+    hours, _, _, plan = make_valid_schedule()
+    with pytest.raises(ReplayValidationError, match="total_cost_bdt mismatch"):
+        verify_response_aggregates(
+            hours,
+            plan,
+            total_grid_kwh=sum(p.grid_kwh for p in plan),
+            total_cost_bdt=0.0,
+            peak_grid_kwh=max(p.grid_kwh for p in plan),
+        )

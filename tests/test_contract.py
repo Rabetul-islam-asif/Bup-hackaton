@@ -7,6 +7,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.config import settings
+from app.schemas import OptimizeEnergyRequest
 from tools.check_nvidia_model import find_sample_pack
 
 client = TestClient(app)
@@ -118,8 +120,21 @@ def test_incoherent_battery_min_greater_than_initial(valid_payload):
     assert response.status_code == 400
 
 
-def test_zero_capacity_rejected(valid_payload):
+def test_zero_capacity_battery_is_accepted(valid_payload):
     payload = copy.deepcopy(valid_payload)
-    payload["battery"]["capacity_kwh"] = 0.0
-    response = client.post("/optimize-energy", json=payload)
-    assert response.status_code == 400
+    payload["battery"] = {
+        "capacity_kwh": 0.0,
+        "initial_energy_kwh": 0.0,
+        "minimum_energy_kwh": 0.0,
+        "max_charge_kwh_per_hour": 0.0,
+        "max_discharge_kwh_per_hour": 0.0,
+    }
+    request = OptimizeEnergyRequest.model_validate(payload)
+    assert request.battery.capacity_kwh == 0.0
+
+
+def test_health_reports_unavailable_without_api_key(monkeypatch):
+    monkeypatch.setattr(settings, "nvidia_api_key", "")
+    response = client.get("/health")
+    assert response.status_code == 503
+    assert response.json() == {"status": "unavailable"}

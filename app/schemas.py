@@ -87,10 +87,7 @@ class BatteryParameters(BaseModel):
     @field_validator("capacity_kwh", mode="before")
     @classmethod
     def validate_capacity(cls, v: Any) -> float:
-        val = _ensure_non_negative_float(v, "capacity_kwh")
-        if val <= 0:
-            raise ValueError(f"capacity_kwh must be positive, got {val}")
-        return val
+        return _ensure_non_negative_float(v, "capacity_kwh")
 
     @field_validator("initial_energy_kwh", mode="before")
     @classmethod

@@ -23,6 +23,7 @@ def test_e2e_health():
     assert resp.json() == {"status": "ok"}
 
 
+@pytest.mark.live
 def test_e2e_optimize_sample_01(sample_pack):
     case = sample_pack["cases"][0]
     payload = case["input"]

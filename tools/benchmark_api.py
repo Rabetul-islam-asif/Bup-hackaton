@@ -15,7 +15,10 @@ root_dir = Path(__file__).resolve().parents[1]
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
-from tools.check_nvidia_model import find_sample_pack
+from app.guardrails import validate_interpretations
+from app.replay import replay_schedule, verify_response_aggregates
+from app.schemas import OptimizeEnergyRequest, OptimizeEnergyResponse
+from tools.check_nvidia_model import compare_ground_truth, find_sample_pack
 
 
 def benchmark_endpoint(
@@ -63,9 +66,35 @@ def benchmark_endpoint(
                 r = requests.post(optimize_url, json=payload, timeout=30.0)
                 elapsed = time.perf_counter() - start
                 r.raise_for_status()
-                data = r.json()
+                request_model = OptimizeEnergyRequest.model_validate(payload)
+                response_model = OptimizeEnergyResponse.model_validate(r.json())
+                actual_directives = [
+                    directive.model_dump() for directive in response_model.directive_interpretation
+                ]
+                expected_directives = validate_interpretations(
+                    {"directive_interpretation": case["expected_output"]["directive_interpretation"]},
+                    note_count=len(request_model.operator_notes),
+                    battery_capacity=request_model.battery.capacity_kwh,
+                    operator_notes=request_model.operator_notes,
+                )
+                differences = compare_ground_truth(actual_directives, expected_directives)
+                if differences:
+                    raise AssertionError("directive semantic mismatch: " + "; ".join(differences))
+                replay_schedule(
+                    request_model.hours,
+                    request_model.battery,
+                    expected_directives,
+                    response_model.hourly_plan,
+                )
+                verify_response_aggregates(
+                    request_model.hours,
+                    response_model.hourly_plan,
+                    response_model.total_grid_kwh,
+                    response_model.total_cost_bdt,
+                    response_model.peak_grid_kwh,
+                )
 
-                cost = data["total_cost_bdt"]
+                cost = response_model.total_cost_bdt
                 cost_delta = abs(cost - expected_cost)
                 if cost_delta > 0.01:
                     failures += 1

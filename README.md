@@ -1,211 +1,182 @@
-# GridWise - LLM-Driven Optimal 24-Hour Campus Energy Scheduler
+# GridWise
 
-GridWise is an automated, production-ready campus energy management system designed for the **BUP CSE Fest 2026** competition. It combines a real Large Language Model (NVIDIA NIM) for natural language operator-note interpretation with strict deterministic guardrails, SciPy HiGHS continuous linear programming, and independent physics-based schedule replay.
+GridWise is the BUP CSE Fest 2026 preliminary-round API for a minimum-cost,
+24-hour campus energy schedule. A live NVIDIA model converts each operator note
+into one of the six allowed directive types. Deterministic code validates those
+directives, compiles constraints, solves the full-day linear program with SciPy
+HiGHS, and replays the serialized plan before returning it.
 
----
+Public service: `https://bup-hackaton.onrender.com`
 
-## 1. System Architecture
+## Processing pipeline
 
 ```text
-┌────────────────────────┐
-│  POST /optimize-energy │
-└───────────┬────────────┘
-            │
-            ▼
-┌────────────────────────┐
-│  FastAPI Input Parser  │ ──> HTTP 400 on malformed schema / non-finite / incoherent data
-└───────────┬────────────┘
-            │
-            ▼
-┌────────────────────────┐
-│ Real NVIDIA LLM NIM    │ ──> Structured operator-notes interpretation (meta/llama-3.2-11b-vision-instruct)
-└───────────┬────────────┘
-            │
-            ▼
-┌────────────────────────┐
-│ Deterministic Guardrail│ ──> Strict type, index, hour 0..23, factor in [0,1], reserve bounds
-└───────────┬────────────┘
-            │
-            ▼
-┌────────────────────────┐
-│  Constraint Compiler   │ ──> Compiles effective solar, reserve, caps, and rate limits
-└───────────┬────────────┘
-            │
-            ▼
-┌────────────────────────┐
-│  SciPy HiGHS LP Solver │ ──> Continuous 96-variable optimization: min sum(tariff * grid)
-└───────────┬────────────┘
-            │
-            ▼
-┌────────────────────────┐
-│  Independent Replay    │ ──> Strict re-verification of energy balance, battery continuity, & neutrality
-└───────────┬────────────┘
-            │
-            ▼
-┌────────────────────────┐
-│ Final JSON Response    │ ──> Exact contest schema with reconciled aggregates & factual summary
-└────────────────────────┘
+POST /optimize-energy
+  -> strict request validation (HTTP 400 on invalid input)
+  -> NVIDIA NIM interpretation (at most two calls in one deadline)
+  -> exact directive-shape and range guardrails
+  -> hourly constraint compilation
+  -> SciPy HiGHS cost minimization
+  -> six-decimal plan serialization
+  -> independent physics, directive, neutrality, and aggregate replay
+  -> contest response (HTTP 200)
 ```
 
-### Key Highlights
-- **Mandatory Real LLM Path:** Every operator note is parsed through NVIDIA NIM with temperature 0. A 1-shot repair loop guarantees resilience without falling back to regex or mock bypasses.
-- **Deterministic Guardrails:** Rejects unsupported directives, improper hour bounds, out-of-range factors/reserves, or boolean coercion.
-- **Single-Action HiGHS Linear Program:** Solves optimal battery dispatch via continuous signed variable $B[h]$ (positive = charge, negative = discharge) across 24 hours (96 variables), enforcing exact terminal neutrality ($E[23] = E_{\text{initial}}$) with no binary variable overhead.
-- **Independent Schedule Replay:** Every schedule is mathematically validated before leaving the service, checking continuity, capacity, caps, and energy balance.
-- **Strict Error Handling:** Follows contest rules with HTTP 400 for structural/schema errors, HTTP 200 for successful schedules, and sanitized HTTP 500 for internal/provider errors without credential leakage.
+The optimizer uses a signed battery movement for each hour: positive means
+charge and negative means discharge. It enforces demand balance, available
+solar, battery capacity and rates, active reserve/grid/window directives, and
+the final battery energy equal to the initial energy. Grid export, battery
+losses, and battery degradation costs are outside the supplied model.
 
----
+## Configuration
 
-## 2. Environment Configuration
+Copy `.env.example` to `.env` and add a fresh NVIDIA key. `.env` files are
+excluded from Git and Docker build context.
 
-GridWise uses environment variables for configuration. Create a local `.env` file for development (do not commit secrets):
+| Variable | Required | Default |
+|---|---|---|
+| `NVIDIA_API_KEY` | Yes | empty |
+| `NVIDIA_MODEL` | No | `meta/llama-3.2-11b-vision-instruct` |
+| `NVIDIA_API_URL` | No | NVIDIA chat-completions endpoint |
+| `LLM_TIMEOUT_SECONDS` | No | `22` |
+| `TOTAL_REQUEST_DEADLINE_SECONDS` | No | `27` |
+| `HOST` | No | `0.0.0.0` |
+| `PORT` | No | `8000` |
+
+PowerShell configuration:
+
+```powershell
+Copy-Item .env.example .env
+$env:NVIDIA_API_KEY = "your-nvapi-key"
+```
+
+Linux/macOS configuration:
 
 ```bash
 cp .env.example .env
-```
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `NVIDIA_API_KEY` | Yes (for live LLM) | `""` | API key from NVIDIA NIM |
-| `NVIDIA_MODEL` | No | `meta/llama-3.2-11b-vision-instruct` | LLM model identifier |
-| `NVIDIA_API_URL` | No | `https://integrate.api.nvidia.com/v1/chat/completions` | Provider completions URL |
-| `LLM_TIMEOUT_SECONDS` | No | `22.0` | Socket timeout for model requests |
-| `TOTAL_REQUEST_DEADLINE_SECONDS` | No | `27.0` | Total request timeout (under 30s contest limit) |
-| `PORT` | No | `8000` | Port to bind server |
-| `HOST` | No | `0.0.0.0` | Host binding interface |
-
----
-
-## 3. Quickstart & Local Setup
-
-### Prerequisites
-- Python 3.11+ (Tested on Python 3.13)
-- Git
-
-### Installation
-
-```bash
-# 1. Create and activate virtual environment
-python -m venv .venv
-
-# On Linux / macOS:
-source .venv/bin/activate
-# On Windows (PowerShell):
-.venv\Scripts\Activate.ps1
-
-# 2. Install pinned dependencies
-pip install -r requirements.txt
-
-# 3. Configure API Key
-# Either in .env or via terminal:
 export NVIDIA_API_KEY="your-nvapi-key"
 ```
 
-### Running the API Server
+## Run locally
 
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+Python 3.13 is used by the Docker image and was used for the recorded local
+verification.
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-### Health Check
+For Linux/macOS, activate with `source .venv/bin/activate`; the remaining
+commands are the same.
+
+`GET /health` returns `200 {"status":"ok"}` only when the model key is
+configured. It returns HTTP 503 when the service cannot accept live work.
 
 ```bash
-curl -X GET http://localhost:8000/health
-# Response: {"status": "ok"}
+curl --fail http://localhost:8000/health
 ```
 
----
+Create a request file from the first official public case and call the endpoint:
 
-## 4. Testing & Verification
-
-### Running Automated Test Suite
-GridWise includes a comprehensive test suite covering API contracts, guardrails, constraints, solver optimality, and replay rejection:
-
-```bash
-pytest tests/ -v
+```powershell
+python -c "import json,pathlib; p=next(pathlib.Path('.').glob('*Public_Sample_Cases*.json')); d=json.loads(p.read_text(encoding='utf-8-sig')); pathlib.Path('sample-request.json').write_text(json.dumps(d['cases'][0]['input']),encoding='utf-8')"
+curl.exe -X POST http://localhost:8000/optimize-energy -H "Content-Type: application/json" --data-binary "@sample-request.json"
 ```
 
-### Offline Optimizer & Replay Benchmark
-Verifies all 10 official contest sample scenarios against organizer ground truth without calling the LLM:
+The successful response contains `scenario_id`, one
+`directive_interpretation` entry per note, 24 ordered `hourly_plan` entries,
+`total_grid_kwh`, `total_cost_bdt`, `peak_grid_kwh`, and `plan_summary`.
+Malformed requests return HTTP 400. Provider, infeasibility, or internal replay
+failures return a sanitized HTTP 500 response.
 
-```bash
+## Verification
+
+Run deterministic tests without using provider quota:
+
+```powershell
+python -m pytest -m "not live" -q
 python tools/run_public_cases.py --offline
+python tools/check_nvidia_model.py --offline
+python -m pip check
 ```
 
-### End-to-End Live LLM Regression
-Runs all 10 official cases through the live NVIDIA model, deterministic guardrails, HiGHS optimizer, and independent replay:
+Run the marked live tests and both full public-case paths with a configured key:
 
-```bash
-python tools/run_public_cases.py
+```powershell
+python -m pytest -m live -q
+python tools/check_nvidia_model.py --timeout 27
+python tools/run_public_cases.py --timeout 27
 ```
 
-### Performance & Latency Benchmark
-Measures p50/p95 latency and reliability across repeated scenario requests:
+Benchmark a running HTTP service. The benchmark validates the response schema,
+directive semantics, organizer-reference constraints, physics replay,
+aggregates, and expected cost for every successful call.
 
-```bash
+```powershell
 python tools/benchmark_api.py --url http://localhost:8000 --iterations 3
 ```
 
----
+Recorded on 18 September 2026 with the configured NVIDIA model:
 
-## 5. Docker Deployment
+- 78/78 pytest cases passed: 67 deterministic and 11 live integration/paraphrase cases.
+- Offline optimizer/replay: 10/10 public cases, zero cost delta.
+- Live production interpreter: 10/10 directive semantics; p95 12.81 seconds.
+- Live full pipeline: 10/10 valid schedules and costs; p50 6.43 seconds,
+  p95/max 13.31 seconds.
+- `pip check` reported no broken requirements; `compileall` passed.
 
-### Build Docker Image
+Provider latency varies, so these measurements are evidence from one run rather
+than a guaranteed service level. The application limits one interpretation to
+two provider calls and a configurable overall budget below the contest's
+30-second request limit.
+
+## Docker
+
+Build and run the same service locally:
 
 ```bash
 docker build -t gridwise:latest .
-```
-
-### Run Container Locally
-
-```bash
-docker run -d \
-  -p 8000:8000 \
+docker run --rm -p 8000:8000 \
   -e NVIDIA_API_KEY="your-nvapi-key" \
   -e NVIDIA_MODEL="meta/llama-3.2-11b-vision-instruct" \
-  --name gridwise-service \
   gridwise:latest
 ```
 
-Test container health:
-```bash
-curl http://localhost:8000/health
-```
+The image binds to `0.0.0.0`, exposes port 8000, runs as a non-root user, and
+has a `/health` healthcheck. A registry image reference is still pending; do
+not treat the local tag as a pullable contest artifact. Docker was not available
+on the verification workstation, so the Dockerfile still needs a clean external
+build-and-run check.
 
----
+## Known boundaries
 
-## 6. Contest Compliance & Verification Evidence
+- The live provider remains an external dependency; quota, regional outages,
+  and latency can cause sanitized HTTP 500 responses.
+- The public specification does not define how two overlapping solar-reduction
+  notes combine. This implementation uses the most restrictive remaining
+  factor for an overlapping hour.
+- Overnight natural-language windows are not normalized across midnight unless
+  they are expressed as separate same-day windows. The published examples are
+  start-inclusive and end-exclusive within one day.
+- The service models a lossless battery and no grid export, matching the supplied
+  preliminary problem statement.
 
-| Requirement | Implementation & Verification Evidence |
-|---|---|
-| **FR-01: Exact API Contract** | Strict Pydantic models in `app/schemas.py`, tested in `tests/test_contract.py` |
-| **FR-02: Mandatory Real LLM** | Live adapter in `app/interpreter.py` calling NVIDIA NIM |
-| **FR-03: Six Directive Types** | Verified on public pack & paraphrases in `tests/fixtures/paraphrases.json` |
-| **FR-04: Deterministic Guardrails** | Strict validation in `app/guardrails.py`, 15 unit tests in `tests/test_guardrails.py` |
-| **FR-05: Effective Constraints** | Compiled in `app/constraints.py`, tested in `tests/test_constraints.py` |
-| **FR-06: HiGHS Cost Minimization** | Continuous linear program in `app/optimizer.py`, 10/10 cases match reference within 0.01 BDT |
-| **FR-07: Exact Replay Validator** | Independent physics verification in `app/replay.py`, tested in `tests/test_replay.py` |
-| **FR-08: Factual Plan Summary** | Summary generation in `app/response.py` based on real dispatch statistics |
-| **FR-09: Safe Error Handling** | Sanitized HTTP 400/500 responses without secret leaks in `app/main.py` |
-| **NFR-01/02: Latency & Reliability**| Average response time < 5s (p95 <= 5s full-credit target); deadline enforced < 27s |
-| **NFR-03: Zero Secret Leakage** | All keys injected via environment; `.dockerignore` and `.gitignore` verified |
+## Delivery status
 
----
+The source and Render service exist. The required pullable registry image,
+organizer-accessible video of at most three minutes, submission receipt, and
+post-deadline repository visibility change still require external accounts or
+manual contest actions. Exact status and evidence are tracked in
+`PROJECT_CONTROL.md`.
 
-## 7. Video Walkthrough Script (3:00 max)
+## Credits
 
-- **0:00 - 0:30 (Problem & Overview):** The challenge of campus microgrid dispatch with variable tariffs, solar forecasts, and unpredictable operator directives.
-- **0:30 - 1:15 (Architecture):** Demonstration of the pipeline: FastAPI -> NVIDIA NIM structured interpretation -> Deterministic guardrails -> Pure constraint compilation.
-- **1:15 - 2:00 (Optimization & Replay):** Formulating the 24-hour continuous LP with SciPy HiGHS; single-action signed battery variable $B[h]$; independent replay validation.
-- **2:00 - 2:35 (Live Demonstration):** Submitting a live request via cURL/HTTP, observing under-5-second response, exact schema output, and 0.00 BDT cost delta against reference.
-- **2:35 - 3:00 (Delivery & Reproducibility):** Docker container execution, test suite passing 100%, repository structure.
-
----
-
-## 8. Third-Party Credits & Libraries
-
-- [FastAPI](https://fastapi.tiangolo.com/) & [Uvicorn](https://www.uvicorn.org/) for asynchronous HTTP services.
-- [Pydantic](https://docs.pydantic.dev/) for strict data schema validation.
-- [SciPy](https://scipy.org/) for the high-performance HiGHS linear programming solver.
-- [NVIDIA NIM](https://build.nvidia.com/) for Llama 3.2 Vision Instruct LLM inference.
-- [pytest](https://docs.pytest.org/) for automated unit and regression testing.
+- FastAPI and Uvicorn: HTTP service
+- Pydantic: strict request and response models
+- SciPy HiGHS: continuous linear programming
+- NVIDIA NIM: mandatory language-model interpretation
+- Requests: provider and verification HTTP clients
+- pytest: automated verification

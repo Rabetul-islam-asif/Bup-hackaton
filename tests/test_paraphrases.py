@@ -11,6 +11,7 @@ FIXTURES_FILE = Path(__file__).resolve().parent / "fixtures" / "paraphrases.json
 CASES = json.loads(FIXTURES_FILE.read_text(encoding="utf-8"))["test_cases"]
 
 
+@pytest.mark.live
 @pytest.mark.parametrize("case", CASES, ids=[c["id"] for c in CASES])
 def test_held_out_paraphrase(case):
     """Verify that unseen wording and distractors are correctly interpreted."""

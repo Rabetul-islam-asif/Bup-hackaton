@@ -156,3 +156,35 @@ def replay_schedule(
         raise ReplayValidationError(
             f"Terminal battery state neutrality violated: final {prev_energy:.4f} != initial {battery.initial_energy_kwh:.4f} (delta={final_delta:.4f})"
         )
+
+
+def verify_response_aggregates(
+    hours: list[HourlyForecast],
+    hourly_plan: list[HourlyPlan],
+    total_grid_kwh: float,
+    total_cost_bdt: float,
+    peak_grid_kwh: float,
+    tolerance: float = TOLERANCE_KWH,
+) -> None:
+    """Verify top-level aggregates against the exact serialized hourly plan."""
+    forecasts = {entry.hour: entry for entry in hours}
+    if len(forecasts) != 24 or len(hourly_plan) != 24:
+        raise ReplayValidationError("cannot verify aggregates without 24 unique forecast and plan hours")
+
+    recalculated_grid = sum(entry.grid_kwh for entry in hourly_plan)
+    recalculated_cost = sum(
+        entry.grid_kwh * forecasts[entry.hour].tariff_bdt_per_kwh
+        for entry in hourly_plan
+    )
+    recalculated_peak = max(entry.grid_kwh for entry in hourly_plan)
+
+    checks = (
+        ("total_grid_kwh", total_grid_kwh, recalculated_grid),
+        ("total_cost_bdt", total_cost_bdt, recalculated_cost),
+        ("peak_grid_kwh", peak_grid_kwh, recalculated_peak),
+    )
+    for name, reported, recalculated in checks:
+        if not math.isfinite(reported) or abs(reported - recalculated) > tolerance:
+            raise ReplayValidationError(
+                f"{name} mismatch: reported {reported:.6f}, recalculated {recalculated:.6f}"
+            )

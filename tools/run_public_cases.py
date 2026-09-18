@@ -24,7 +24,7 @@ from app.constraints import compile_hourly_constraints
 from app.guardrails import validate_interpretations
 from app.interpreter import interpreter
 from app.optimizer import solve_energy_schedule
-from app.replay import replay_schedule
+from app.replay import replay_schedule, verify_response_aggregates
 from app.response import assemble_optimization_response
 from app.schemas import OptimizeEnergyRequest
 from tools.check_nvidia_model import compare_ground_truth, find_sample_pack
@@ -50,13 +50,41 @@ def run_cases(
         try:
             req = OptimizeEnergyRequest.model_validate(case["input"])
 
+            # Validate and solve the organizer reference independently. This
+            # proves the deterministic pipeline can reproduce the expected
+            # result even when live extraction is also under test.
+            reference_directives = validate_interpretations(
+                {"directive_interpretation": expected_directives},
+                note_count=len(req.operator_notes),
+                battery_capacity=req.battery.capacity_kwh,
+                operator_notes=req.operator_notes,
+            )
+            reference_constraints = compile_hourly_constraints(
+                req.hours, req.battery, reference_directives
+            )
+            reference_result = solve_energy_schedule(reference_constraints)
+            reference_response = assemble_optimization_response(
+                req.scenario_id, req.hours, reference_directives, reference_result
+            )
+            replay_schedule(
+                req.hours, req.battery, reference_directives, reference_response.hourly_plan
+            )
+            verify_response_aggregates(
+                req.hours,
+                reference_response.hourly_plan,
+                reference_response.total_grid_kwh,
+                reference_response.total_cost_bdt,
+                reference_response.peak_grid_kwh,
+            )
+            reference_delta = abs(reference_response.total_cost_bdt - expected_cost)
+            if reference_delta > 0.01:
+                raise AssertionError(
+                    f"reference pipeline cost delta {reference_delta:.4f} exceeds 0.01"
+                )
+
             # Step 1: Directive Interpretation
             if offline:
-                validated_directives = validate_interpretations(
-                    {"directive_interpretation": expected_directives},
-                    note_count=len(req.operator_notes),
-                    battery_capacity=req.battery.capacity_kwh,
-                )
+                validated_directives = reference_directives
             else:
                 validated_directives = interpreter.interpret(
                     scenario_id=req.scenario_id,
@@ -67,9 +95,9 @@ def run_cases(
                 # Check semantic alignment with expected directives
                 semantic_diffs = compare_ground_truth(validated_directives, expected_directives)
                 if semantic_diffs:
-                    print(f"WARN [{case_id}] Directive semantic diffs from reference:")
-                    for diff in semantic_diffs:
-                        print(f"  - {diff}")
+                    raise AssertionError(
+                        "directive semantic mismatch: " + "; ".join(semantic_diffs)
+                    )
 
             # Step 2: Compile Constraints
             constraints = compile_hourly_constraints(req.hours, req.battery, validated_directives)
@@ -82,6 +110,13 @@ def run_cases(
 
             # Step 5: Independent Replay
             replay_schedule(req.hours, req.battery, validated_directives, resp.hourly_plan)
+            verify_response_aggregates(
+                req.hours,
+                resp.hourly_plan,
+                resp.total_grid_kwh,
+                resp.total_cost_bdt,
+                resp.peak_grid_kwh,
+            )
 
             elapsed = time.perf_counter() - start_time
             timings.append(elapsed)

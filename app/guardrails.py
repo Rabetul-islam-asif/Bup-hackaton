@@ -188,15 +188,11 @@ def validate_interpretations(
         if entry["applies"] is not True:
             raise DirectiveValidationError(f"{directive_type} requires applies=true")
 
-        # Allow robust handling of extraneous keys in no_charge/no_discharge window
-        if directive_type in ("no_charge_window", "no_discharge_window"):
-            if not isinstance(adjustment, dict) or "hours" not in adjustment:
-                raise DirectiveValidationError(f"{directive_type} missing hours field")
-        else:
-            if not isinstance(adjustment, dict) or set(adjustment.keys()) != ADJUSTMENT_KEYS[directive_type]:
-                raise DirectiveValidationError(
-                    f"{directive_type} has incorrect adjustment fields: {set(adjustment.keys()) if isinstance(adjustment, dict) else type(adjustment).__name__}"
-                )
+        if not isinstance(adjustment, dict) or set(adjustment.keys()) != ADJUSTMENT_KEYS[directive_type]:
+            raise DirectiveValidationError(
+                f"{directive_type} has incorrect adjustment fields: "
+                f"{set(adjustment.keys()) if isinstance(adjustment, dict) else type(adjustment).__name__}"
+            )
 
         raw_hours = adjustment["hours"]
         if not isinstance(raw_hours, list) or len(raw_hours) == 0:

@@ -113,3 +113,35 @@ def test_battery_at_minimum_initial_energy():
     # Final state must restore to initial (30.0)
     assert abs(resp.hourly_plan[23].battery_energy_after_kwh - 30.0) < 1e-4
 
+
+def test_zero_capacity_battery_solve_and_replay():
+    """Verify optimizer and replay when battery capacity and all rates are 0.0."""
+    from app.schemas import BatteryParameters, HourlyForecast
+
+    hours = [
+        HourlyForecast(
+            hour=h,
+            demand_kwh=50.0,
+            solar_kwh=20.0 if 10 <= h <= 14 else 0.0,
+            tariff_bdt_per_kwh=10.0,
+        )
+        for h in range(24)
+    ]
+    battery = BatteryParameters(
+        capacity_kwh=0.0,
+        initial_energy_kwh=0.0,
+        minimum_energy_kwh=0.0,
+        max_charge_kwh_per_hour=0.0,
+        max_discharge_kwh_per_hour=0.0,
+    )
+    directives = []
+    constraints = compile_hourly_constraints(hours, battery, directives)
+    opt_res = solve_energy_schedule(constraints)
+    resp = assemble_optimization_response("ZERO_BATTERY", hours, directives, opt_res)
+
+    replay_schedule(hours, battery, directives, resp.hourly_plan)
+    # All battery actions must be idle, 0 kwh
+    for p in resp.hourly_plan:
+        assert p.battery_action == "idle"
+        assert p.battery_kwh == 0.0
+        assert p.battery_energy_after_kwh == 0.0

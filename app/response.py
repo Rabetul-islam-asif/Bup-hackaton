@@ -53,29 +53,26 @@ def assemble_optimization_response(
     sorted_forecasts = sorted(hours, key=lambda x: x.hour)
 
     hourly_plan: list[HourlyPlan] = []
-    recalculated_grid = 0.0
-    recalculated_cost = 0.0
-    peak_grid = 0.0
-
     for raw in opt_result.hourly_results:
         h = raw.hour
-        tariff = sorted_forecasts[h].tariff_bdt_per_kwh
-        g = raw.grid_kwh
-
-        recalculated_grid += g
-        recalculated_cost += g * tariff
-        if g > peak_grid:
-            peak_grid = g
-
         plan_entry = HourlyPlan(
             hour=h,
-            grid_kwh=round(g, 6),
+            grid_kwh=round(raw.grid_kwh, 6),
             solar_used_kwh=round(raw.solar_used_kwh, 6),
             battery_action=raw.battery_action,
             battery_kwh=round(raw.battery_kwh, 6),
             battery_energy_after_kwh=round(raw.battery_energy_after_kwh, 6),
         )
         hourly_plan.append(plan_entry)
+
+    # The serialized hourly plan is the response source of truth. Calculate all
+    # aggregates from those exact values so judge-side recalculation agrees.
+    recalculated_grid = sum(entry.grid_kwh for entry in hourly_plan)
+    recalculated_cost = sum(
+        entry.grid_kwh * sorted_forecasts[entry.hour].tariff_bdt_per_kwh
+        for entry in hourly_plan
+    )
+    peak_grid = max((entry.grid_kwh for entry in hourly_plan), default=0.0)
 
     directive_objects = [
         DirectiveInterpretation(

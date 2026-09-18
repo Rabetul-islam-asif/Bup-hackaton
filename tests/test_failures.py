@@ -1,6 +1,7 @@
 """Failure injection and error handling tests."""
 
 from unittest.mock import patch
+import json
 import pytest
 from fastapi.testclient import TestClient
 
@@ -17,6 +18,54 @@ def test_missing_api_key_raises_provider_error():
     dummy_interpreter = LLMInterpreter(api_key="")
     with pytest.raises(LLMProviderError, match="NVIDIA_API_KEY is not configured"):
         dummy_interpreter.interpret("TEST", ["Some note"], 100.0)
+
+
+def _valid_no_op_content() -> str:
+    return json.dumps({
+        "directive_interpretation": [{
+            "note_index": 0,
+            "applies": False,
+            "directive_type": "no_op",
+            "structured_adjustment": None,
+            "explanation": "No scheduling instruction.",
+        }]
+    })
+
+
+def test_interpreter_retries_one_transient_provider_failure():
+    instance = LLMInterpreter(api_key="test")
+    with patch.object(
+        instance,
+        "_call_api",
+        side_effect=[LLMProviderError("temporary", retryable=True), _valid_no_op_content()],
+    ) as call:
+        result = instance.interpret("RETRY", ["Routine inspection."], 100.0, timeout=5.0)
+    assert result[0]["directive_type"] == "no_op"
+    assert call.call_count == 2
+
+
+def test_interpreter_repairs_invalid_json_once():
+    instance = LLMInterpreter(api_key="test")
+    with patch.object(
+        instance,
+        "_call_api",
+        side_effect=["not json", _valid_no_op_content()],
+    ) as call:
+        result = instance.interpret("REPAIR", ["Routine inspection."], 100.0, timeout=5.0)
+    assert result[0]["directive_type"] == "no_op"
+    assert call.call_count == 2
+
+
+def test_interpreter_does_not_retry_permanent_provider_failure():
+    instance = LLMInterpreter(api_key="test")
+    with patch.object(
+        instance,
+        "_call_api",
+        side_effect=LLMProviderError("bad request", retryable=False),
+    ) as call:
+        with pytest.raises(LLMProviderError, match="bad request"):
+            instance.interpret("NO-RETRY", ["Routine inspection."], 100.0, timeout=5.0)
+    assert call.call_count == 1
 
 
 def test_solver_infeasible_scenario_raises_error():
@@ -132,4 +181,3 @@ def test_api_handles_replay_validation_failure_sanitized():
             response = client.post("/optimize-energy", json=payload)
             assert response.status_code == 500
             assert response.json()["detail"] == "Internal schedule verification failed"
-

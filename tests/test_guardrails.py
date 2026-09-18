@@ -165,6 +165,40 @@ def test_rejects_extra_fields():
         validate_interpretations(payload, note_count=1, battery_capacity=200.0)
 
 
+def test_rejects_extra_fields_in_window_adjustments():
+    payload = {
+        "directive_interpretation": [
+            {
+                "note_index": 0,
+                "applies": True,
+                "directive_type": "no_charge_window",
+                "structured_adjustment": {"hours": [1, 2], "factor": 0.5},
+                "explanation": "No charging",
+            }
+        ]
+    }
+    with pytest.raises(DirectiveValidationError, match="incorrect adjustment fields"):
+        validate_interpretations(payload, note_count=1, battery_capacity=100.0)
+
+
+
+@pytest.mark.parametrize("directive_type", ["no_charge_window", "no_discharge_window"])
+def test_rejects_extra_adjustment_fields_for_battery_windows(directive_type):
+    payload = {
+        "directive_interpretation": [
+            {
+                "note_index": 0,
+                "applies": True,
+                "directive_type": directive_type,
+                "structured_adjustment": {"hours": [1, 2], "factor": 0.5},
+                "explanation": "Window constraint.",
+            }
+        ]
+    }
+    with pytest.raises(DirectiveValidationError):
+        validate_interpretations(payload, note_count=1, battery_capacity=200.0)
+
+
 def test_rejects_active_with_applies_false():
     payload = copy.deepcopy(VALID_SOLAR)
     payload["directive_interpretation"][0]["applies"] = False
@@ -221,4 +255,3 @@ def test_extract_window_range_edge_cases():
     assert extract_window_range("between 18:00 and 20:00") == [18, 19]
     assert extract_window_range("from 14:00 to 17:00") == [14, 15, 16]
     assert extract_window_range("between 9:00 and 13:00") == [9, 10, 11, 12]
-

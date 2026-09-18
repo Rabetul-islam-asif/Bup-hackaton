@@ -15,7 +15,7 @@ from app.constraints import compile_hourly_constraints
 from app.guardrails import DirectiveValidationError
 from app.interpreter import LLMProviderError, interpreter
 from app.optimizer import OptimizationInfeasibleError, solve_energy_schedule
-from app.replay import ReplayValidationError, replay_schedule
+from app.replay import ReplayValidationError, replay_schedule, verify_response_aggregates
 from app.response import assemble_optimization_response
 from app.schemas import (
     HealthResponse,
@@ -56,7 +56,7 @@ app = FastAPI(
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Contest Requirement: Return HTTP 400 for structural/schema validation errors."""
-    logger.warning("Request validation failed: %s", exc)
+    logger.warning("Request validation failed with %d error(s)", len(exc.errors()))
     sanitized_errors = [
         {
             "loc": [str(x) for x in err.get("loc", [])],
@@ -109,7 +109,8 @@ async def replay_exception_handler(request: Request, exc: ReplayValidationError)
 
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
-    logger.exception("Unhandled server error: %s", exc)
+    # The contest rules prohibit exposing stack traces in logs or responses.
+    logger.error("Unhandled server error of type %s", type(exc).__name__)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "Internal server error"},
@@ -119,9 +120,14 @@ async def generic_exception_handler(request: Request, exc: Exception):
 # --- Endpoints ---
 
 
-@app.get("/health", response_model=HealthResponse, tags=["System"])
-async def get_health() -> HealthResponse:
+@app.get("/health", response_model=HealthResponse, tags=["System"], responses={503: {"description": "Service not ready"}})
+async def get_health() -> HealthResponse | JSONResponse:
     """Return health status of the service."""
+    if not settings.is_llm_configured():
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "unavailable"},
+        )
     return HealthResponse(status="ok")
 
 
@@ -161,6 +167,13 @@ def optimize_energy(payload: OptimizeEnergyRequest) -> OptimizeEnergyResponse:
         battery=payload.battery,
         validated_directives=validated_directives,
         hourly_plan=response.hourly_plan,
+    )
+    verify_response_aggregates(
+        hours=payload.hours,
+        hourly_plan=response.hourly_plan,
+        total_grid_kwh=response.total_grid_kwh,
+        total_cost_bdt=response.total_cost_bdt,
+        peak_grid_kwh=response.peak_grid_kwh,
     )
 
     logger.info("Scenario '%s' optimized successfully: Cost=%.2f BDT, Grid=%.2f kWh", response.scenario_id, response.total_cost_bdt, response.total_grid_kwh)

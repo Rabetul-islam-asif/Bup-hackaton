@@ -101,6 +101,92 @@
           }
         }
       ]
+    },
+    {
+      "id": "PARAPHRASE-06",
+      "operator_notes": [
+        "PV generation will drop by 40% between 14:00 and 17:00 due to overhead cloud cover."
+      ],
+      "battery_capacity_kwh": 200.0,
+      "expected_directives": [
+        {
+          "note_index": 0,
+          "applies": true,
+          "directive_type": "solar_reduction",
+          "structured_adjustment": {
+            "hours": [14, 15, 16],
+            "factor": 0.6
+          }
+        }
+      ]
+    },
+    {
+      "id": "PARAPHRASE-07",
+      "operator_notes": [
+        "Keep at least 150 kWh stored in the battery system from 10 PM until midnight."
+      ],
+      "battery_capacity_kwh": 300.0,
+      "expected_directives": [
+        {
+          "note_index": 0,
+          "applies": true,
+          "directive_type": "minimum_battery_reserve",
+          "structured_adjustment": {
+            "hours": [22, 23],
+            "minimum_energy_kwh": 150.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "PARAPHRASE-08",
+      "operator_notes": [
+        "No charging of the battery bank allowed starting at 2 PM for 3 hours."
+      ],
+      "battery_capacity_kwh": 200.0,
+      "expected_directives": [
+        {
+          "note_index": 0,
+          "applies": true,
+          "directive_type": "no_charge_window",
+          "structured_adjustment": {
+            "hours": [14, 15, 16]
+          }
+        }
+      ]
+    },
+    {
+      "id": "PARAPHRASE-09",
+      "operator_notes": [
+        "Grid import cap of 75 kWh is enforced between 18:00 and 21:00."
+      ],
+      "battery_capacity_kwh": 250.0,
+      "expected_directives": [
+        {
+          "note_index": 0,
+          "applies": true,
+          "directive_type": "max_grid_window",
+          "structured_adjustment": {
+            "hours": [18, 19, 20],
+            "max_grid_kwh": 75.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "PARAPHRASE-10",
+      "operator_notes": [
+        "Routine grounds maintenance completed at noon; everything running normally."
+      ],
+      "battery_capacity_kwh": 200.0,
+      "expected_directives": [
+        {
+          "note_index": 0,
+          "applies": false,
+          "directive_type": "no_op",
+          "structured_adjustment": null
+        }
+      ]
     }
   ]
 }

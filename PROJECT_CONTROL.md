@@ -18,7 +18,7 @@ Version: 1.1 | Updated: 18 September 2026 | Project: BUP CSE Fest 2026 online pr
 | Event calendar date and timezone | TBD - confirm official announcement |
 | Published round window | 7:00 PM-11:00 PM; four hours |
 | Submission destination | TBD - confirm organizer instructions |
-| Repository URL | TBD - create after question reveal; private during event |
+| Repository URL | https://github.com/Rabetul-islam-asif/Bup-hackaton.git |
 | Public API base URL | TBD |
 | Provider / model identifier | NVIDIA; NVIDIA_API_KEY and NVIDIA_MODEL present in local .env; live access and model quality unverified |
 | Solver / runtime / hosting | Proposed Python/FastAPI + SciPy HiGHS; install/container checks and hosting selection pending |
@@ -219,8 +219,8 @@ Change log format for future decisions: `timestamp | decision/change | source or
 | API base URL | TBD |
 | Health URL | TBD |
 | Optimization URL | TBD |
-| Repository URL | TBD |
-| Submitted commit | TBD |
+| Repository URL | https://github.com/Rabetul-islam-asif/Bup-hackaton.git |
+| Submitted commit | 8a50297 |
 | Image reference / digest | TBD |
 | Documented service port | TBD |
 | Provider / model identifier | TBD |

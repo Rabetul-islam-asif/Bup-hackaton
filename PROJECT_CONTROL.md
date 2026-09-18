@@ -220,14 +220,14 @@ Change log format for future decisions: `timestamp | decision/change | source or
 | Health URL | https://bup-hackaton.onrender.com/health |
 | Optimization URL | https://bup-hackaton.onrender.com/optimize-energy |
 | Repository URL | https://github.com/Rabetul-islam-asif/Bup-hackaton.git |
-| Candidate application commit | d75ce91 |
-| Image reference / digest | TBD |
+| Candidate application commit | b9d16ff |
+| Image reference / digest | ghcr.io/rabetul-islam-asif/gridwise:latest |
 | Documented service port | 8000 |
 | Provider / model identifier | NVIDIA (meta/llama-3.2-11b-vision-instruct) |
 | Required environment-variable names only | NVIDIA_API_KEY, NVIDIA_MODEL |
 | README location | `/README.md` |
 | Video URL / file and duration | TBD |
-| Last external verification time | 18 September 2026, 22:39 Asia/Dhaka; deployed OpenAPI update, health, and SAMPLE-01 passed |
+| Last external verification time | 18 September 2026, 22:49 Asia/Dhaka; health (610ms) and SAMPLE-01 (exact match, schema, replay, aggregates) verified |
 | Submission time and receipt | TBD |
 | Post-deadline repository visibility verified | TBD |
 

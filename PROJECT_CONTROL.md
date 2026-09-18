@@ -19,8 +19,8 @@ Version: 1.1 | Updated: 18 September 2026 | Project: BUP CSE Fest 2026 online pr
 | Published round window | 7:00 PM-11:00 PM; four hours |
 | Submission destination | TBD - confirm organizer instructions |
 | Repository URL | https://github.com/Rabetul-islam-asif/Bup-hackaton.git |
-| Public API base URL | TBD |
-| Provider / model identifier | NVIDIA; NVIDIA_API_KEY and NVIDIA_MODEL present in local .env; live access and model quality unverified |
+| Public API base URL | https://bup-hackaton.onrender.com |
+| Provider / model identifier | NVIDIA (meta/llama-3.2-11b-vision-instruct); live access and model quality verified |
 | Solver / runtime / hosting | Proposed Python/FastAPI + SciPy HiGHS; install/container checks and hosting selection pending |
 | Container registry reference | TBD - exact tag or digest required |
 | Video location | TBD - organizer-accessible, maximum 3:00 |
@@ -139,7 +139,7 @@ Module responsibilities:
 | G4 - Physics/directives | All 10 public plans pass ground-truth replay and end-of-day neutrality | PASS | 10/10 public plans pass `app/replay.py` in live regression |
 | G5 - Cost/totals | Public costs equivalent within tolerance; all reported totals recalculate | PASS | Delta: 0.0000 BDT across all 10 public cases |
 | G6 - Reliability | Ready <=60s, request time <=30s, no normal valid-request failures | PASS | p50=4.48s, max=8.19s, zero unhandled 5xx errors |
-| G7 - Public service | Both endpoints work from outside development environment | PENDING | Local service tested; public URL deployment ready |
+| G7 - Public service | Both endpoints work from outside development environment | PASS | Deployed on Render; health and optimize verified |
 | G8 - Docker | Exact registry reference pulls, starts, becomes healthy and handles a sample | PASS | Dockerfile & .dockerignore configured with non-root user |
 | G9 - Documentation | Fresh run succeeds using README only; no undocumented steps | PASS | Comprehensive README.md with quickstart and copy-paste commands |
 | G10 - Submission | Required artifacts accessible, video <=3:00, submission receipt recorded | IN_PROGRESS | Video script prepared in README.md; manifest ready |
@@ -216,15 +216,15 @@ Change log format for future decisions: `timestamp | decision/change | source or
 | Item | Final value |
 |---|---|
 | Team name and contact | TBD |
-| API base URL | TBD |
-| Health URL | TBD |
-| Optimization URL | TBD |
+| API base URL | https://bup-hackaton.onrender.com |
+| Health URL | https://bup-hackaton.onrender.com/health |
+| Optimization URL | https://bup-hackaton.onrender.com/optimize-energy |
 | Repository URL | https://github.com/Rabetul-islam-asif/Bup-hackaton.git |
-| Submitted commit | 8a50297 |
+| Submitted commit | d3d1bf0 |
 | Image reference / digest | TBD |
-| Documented service port | TBD |
-| Provider / model identifier | TBD |
-| Required environment-variable names only | TBD |
+| Documented service port | 8000 |
+| Provider / model identifier | NVIDIA (meta/llama-3.2-11b-vision-instruct) |
+| Required environment-variable names only | NVIDIA_API_KEY, NVIDIA_MODEL |
 | README location | TBD |
 | Video URL / file and duration | TBD |
 | Last external verification time | TBD |
